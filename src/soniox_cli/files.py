@@ -57,17 +57,20 @@ def list_files() -> None:
     file_list = list(result.files)
     next_cursor = result.next_page_cursor
 
+    cursor = 0
     while True:
         entries = [truncate(_build_entry(f)) for f in file_list]
         if next_cursor:
             entries.append("Load more...")
         entries.append("Back")
 
-        menu = TerminalMenu(entries, title="\nFiles\n")
+        menu = TerminalMenu(entries, title="\nFiles\n", cursor_index=cursor)
         choice = menu.show()
 
         if choice is None or choice == len(entries) - 1:
             break
+
+        cursor = choice
 
         if next_cursor and choice == len(entries) - 2:
             with Spinner("Loading more..."):

@@ -3,7 +3,13 @@ from simple_term_menu import TerminalMenu
 
 import sys
 
-from soniox_cli.cache import delete_cache, get_cached_meta, get_cached_transcript, is_terminal, save
+from soniox_cli.cache import (
+    delete_cache,
+    get_cached_meta,
+    get_cached_transcript,
+    is_terminal,
+    save,
+)
 from soniox_cli.client import get_client
 from soniox_cli.spinner import Spinner
 from soniox_cli.util import truncate
@@ -117,12 +123,15 @@ def _show_transcription(tx_id: str) -> bool:
         if choice == 2:
             if meta:
                 import json
+
                 _copy_to_clipboard(json.dumps(meta, indent=2, default=str))
                 copied_json = True
                 copied_text = False
 
         if choice == 3:
-            confirm = TerminalMenu(["Yes", "No"], title=f"\nDelete transcription {tx_id}?\n")
+            confirm = TerminalMenu(
+                ["Yes", "No"], title=f"\nDelete transcription {tx_id}?\n"
+            )
             if confirm.show() == 0:
                 client = get_client()
                 with Spinner(f"Deleting {tx_id}..."):
@@ -167,22 +176,30 @@ def list_transcriptions() -> None:
     tx_list = [(t.id, t.status, t.created_at) for t in result.transcriptions]
     next_cursor = result.next_page_cursor
 
+    cursor = 0
     while True:
-        entries = [truncate(_build_entry(tx_id, status, created_at)) for tx_id, status, created_at in tx_list]
+        entries = [
+            truncate(_build_entry(tx_id, status, created_at))
+            for tx_id, status, created_at in tx_list
+        ]
         if next_cursor:
             entries.append("Load more...")
         entries.append("Back")
 
-        menu = TerminalMenu(entries, title="\nTranscriptions\n")
+        menu = TerminalMenu(entries, title="\nTranscriptions\n", cursor_index=cursor)
         choice = menu.show()
 
         if choice is None or choice == len(entries) - 1:
             break
 
+        cursor = choice
+
         if next_cursor and choice == len(entries) - 2:
             with Spinner("Loading more..."):
                 result = client.stt.list(limit=PAGE_SIZE, cursor=next_cursor)
-            tx_list.extend((t.id, t.status, t.created_at) for t in result.transcriptions)
+            tx_list.extend(
+                (t.id, t.status, t.created_at) for t in result.transcriptions
+            )
             next_cursor = result.next_page_cursor
             continue
 

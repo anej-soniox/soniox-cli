@@ -91,8 +91,10 @@ def switch_api_key() -> None:
     os.environ[ENV_VAR] = key
 
     from soniox_cli.client import reset_client
+    from soniox_cli.settings import reset_models_cache
 
     reset_client()
+    reset_models_cache()
 
     if click.confirm("Save API key to shell rc file?", default=True):
         _save_key_to_rc(key)
