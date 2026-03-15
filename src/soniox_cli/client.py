@@ -10,3 +10,8 @@ def get_client() -> SonioxClient:
     if _client is None:
         _client = SonioxClient(api_key=require_api_key())
     return _client
+
+
+def reset_client() -> None:
+    global _client
+    _client = None

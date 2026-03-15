@@ -79,3 +79,24 @@ def require_api_key() -> str:
             f"API key required. Set {ENV_VAR} or run `soniox` interactively."
         )
     return key
+
+
+def switch_api_key() -> None:
+    import click
+
+    key = click.prompt("Enter new Soniox API key", hide_input=True)
+    if not key:
+        return
+
+    os.environ[ENV_VAR] = key
+
+    from soniox_cli.client import reset_client
+
+    reset_client()
+
+    if click.confirm("Save API key to shell rc file?", default=True):
+        _save_key_to_rc(key)
+        rc = get_rc_file()
+        click.echo(f"Saved to {rc}.")
+
+    click.echo("API key updated.")
