@@ -1,8 +1,6 @@
 import click
 from simple_term_menu import TerminalMenu
 
-import sys
-
 from soniox_cli.cache import (
     delete_cache,
     get_cached_meta,
@@ -72,12 +70,33 @@ def _fetch_and_cache(transcription_id: str) -> str | None:
     return text
 
 
-def _copy_to_clipboard(text: str) -> None:
-    import base64
+def _copy_to_clipboard(text: str) -> bool:
+    """Copy text to system clipboard. Returns True on success."""
+    import subprocess
 
-    encoded = base64.b64encode(text.encode()).decode()
-    sys.stdout.write(f"\033]52;c;{encoded}\a")
-    sys.stdout.flush()
+    import pyperclip
+
+    # pyperclip's wl-copy backend hangs because it calls communicate()
+    # which waits for wl-copy's daemon process. Patch it to write + close
+    # stdin without waiting.
+    if pyperclip._executable_exists("wl-copy"):
+        try:
+            p = subprocess.Popen(["wl-copy"], stdin=subprocess.PIPE, close_fds=True)
+            p.stdin.write(text.encode("utf-8"))
+            p.stdin.close()
+            return True
+        except (OSError, FileNotFoundError) as e:
+            click.echo(f"\nClipboard error: {e}")
+            click.pause()
+            return False
+
+    try:
+        pyperclip.copy(text)
+        return True
+    except pyperclip.PyperclipException as e:
+        click.echo(f"\n{e}")
+        click.pause()
+        return False
 
 
 def _show_transcription(tx_id: str) -> bool:
@@ -115,8 +134,7 @@ def _show_transcription(tx_id: str) -> bool:
             return False
 
         if choice == 1:
-            if text:
-                _copy_to_clipboard(text)
+            if text and _copy_to_clipboard(text):
                 copied_text = True
                 copied_json = False
 
@@ -124,9 +142,9 @@ def _show_transcription(tx_id: str) -> bool:
             if meta:
                 import json
 
-                _copy_to_clipboard(json.dumps(meta, indent=2, default=str))
-                copied_json = True
-                copied_text = False
+                if _copy_to_clipboard(json.dumps(meta, indent=2, default=str)):
+                    copied_json = True
+                    copied_text = False
 
         if choice == 3:
             confirm = TerminalMenu(

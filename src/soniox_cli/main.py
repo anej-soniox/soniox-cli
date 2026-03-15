@@ -3,7 +3,6 @@ from simple_term_menu import TerminalMenu
 
 from soniox_cli.config import get_api_key, switch_api_key
 from soniox_cli.files import list_files
-from soniox_cli.settings import show_settings_form
 from soniox_cli.transcribe import transcribe_file
 from soniox_cli.transcriptions import list_transcriptions
 
