@@ -3,6 +3,7 @@ from simple_term_menu import TerminalMenu
 
 from soniox_cli.client import get_client
 from soniox_cli.spinner import Spinner
+from soniox_cli.util import truncate
 
 PAGE_SIZE = 50
 
@@ -16,7 +17,7 @@ def _format_size(size: int) -> str:
 
 
 def _build_entry(f: object) -> str:
-    return f"{f.id}  {f.filename:30s}  {_format_size(f.size):>10s}  {f.created_at:%Y-%m-%d %H:%M}"
+    return f"{f.created_at:%Y-%m-%d %H:%M}  {f.id}  {f.filename:30s}  {_format_size(f.size):>10s}"
 
 
 def _file_actions(file_id: str, filename: str) -> bool:
@@ -57,7 +58,7 @@ def list_files() -> None:
     next_cursor = result.next_page_cursor
 
     while True:
-        entries = [_build_entry(f) for f in file_list]
+        entries = [truncate(_build_entry(f)) for f in file_list]
         if next_cursor:
             entries.append("Load more...")
         entries.append("Back")

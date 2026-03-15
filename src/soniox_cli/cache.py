@@ -36,3 +36,11 @@ def save(transcription_id: str, meta: dict[str, Any], transcript: str | None = N
     (d / "meta.json").write_text(json.dumps(meta, indent=2, default=str))
     if transcript is not None:
         (d / "transcript.txt").write_text(transcript)
+
+
+def delete_cache(transcription_id: str) -> None:
+    import shutil
+
+    d = _tx_dir(transcription_id)
+    if d.exists():
+        shutil.rmtree(d)
