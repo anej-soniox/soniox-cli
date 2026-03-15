@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "soniox-cli"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "soniox>=1.0.0",
+    "click>=8.0",
+    "pydantic>=2.0",
+    "simple-term-menu>=1.6",
+]
+
+[project.scripts]
+soniox = "soniox_cli.main:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/soniox_cli"]
