@@ -129,11 +129,11 @@ def settings_to_config(settings: TranscriptionSettings) -> CreateTranscriptionCo
 _models_cache: list | None = None
 
 
-def get_available_models() -> list:
+def get_available_models(title: str = "Soniox CLI › Settings") -> list:
     global _models_cache
     if _models_cache is None:
         client = get_client()
-        with Spinner("Fetching models..."):
+        with Spinner("Fetching models...", title=title):
             result = client.models.list()
         _models_cache = [m for m in result.models if m.transcription_mode == "async"]
     return _models_cache
@@ -166,28 +166,29 @@ def _on_off(val: bool) -> str:
 
 
 def _edit_model(settings: TranscriptionSettings) -> None:
-    models = get_available_models()
+    models = get_available_models(title="Soniox CLI › Settings › Model")
     if not models:
         click.echo("No async models available.")
         return
 
-    entries = [f"{m.id}  ({m.name})" for m in models]
-    entries.append("Back")
+    entries = ["Back"]
+    entries.extend(f"{m.id}  ({m.name})" for m in models)
 
     current_idx = next((i for i, m in enumerate(models) if m.id == settings.model), None)
+    cursor = (current_idx + 1) if current_idx is not None else 1
     menu = TerminalMenu(
         entries,
-        title="\nSelect model\n",
-        cursor_index=current_idx if current_idx is not None else 0,
+        title="\nSoniox CLI › Settings › Model\n",
+        cursor_index=cursor,
     )
     choice = menu.show()
-    if choice is not None and choice < len(models):
-        settings.model = models[choice].id
+    if choice is not None and choice > 0:
+        settings.model = models[choice - 1].id
 
 
-def _get_languages_for_model(model_id: str) -> list[tuple[str, str]]:
+def _get_languages_for_model(model_id: str, title: str = "Soniox CLI › Settings") -> list[tuple[str, str]]:
     """Return [(code, name), ...] for the currently selected model."""
-    models = get_available_models()
+    models = get_available_models(title=title)
     for m in models:
         if m.id == model_id:
             return [(lang.code, lang.name) for lang in m.languages]
@@ -195,18 +196,19 @@ def _get_languages_for_model(model_id: str) -> list[tuple[str, str]]:
 
 
 def _edit_language_hints(settings: TranscriptionSettings) -> None:
-    languages = _get_languages_for_model(settings.model)
+    languages = _get_languages_for_model(settings.model, title="Soniox CLI › Settings › Language hints")
     if not languages:
         click.echo("No languages available for the selected model.")
         return
 
     selected = set(settings.language_hints)
-    entries = [f"{code:>4s}  {name}" for code, name in languages]
-    preselected = [i for i, (code, _) in enumerate(languages) if code in selected]
+    entries = ["Back"]
+    entries.extend(f"{code:>4s}  {name}" for code, name in languages)
+    preselected = [i + 1 for i, (code, _) in enumerate(languages) if code in selected]
 
     menu = TerminalMenu(
         entries,
-        title="\nLanguage hints (type to filter, tab to toggle, enter to confirm)\n",
+        title="\nSoniox CLI › Settings › Language hints (type to filter, tab to toggle, enter to confirm)\n",
         multi_select=True,
         show_multi_select_hint=True,
         multi_select_select_on_accept=False,
@@ -215,63 +217,67 @@ def _edit_language_hints(settings: TranscriptionSettings) -> None:
         search_key=None,
         multi_select_keys=("tab",),
     )
-    menu.show()
+    choice = menu.show()
 
     # chosen_accept_key is None when user pressed escape (cancel)
     if menu.chosen_accept_key is None:
         return
 
+    # Back selected via enter on index 0
+    if choice == 0 or (isinstance(choice, tuple) and 0 in choice):
+        return
+
     chosen = menu.chosen_menu_indices
-    settings.language_hints = [languages[i][0] for i in chosen] if chosen else []
+    settings.language_hints = [languages[i - 1][0] for i in chosen if i > 0] if chosen else []
 
 
 def _pick_language(settings: TranscriptionSettings, title: str, current: str | None = None) -> str | None:
     """Show a searchable language picker. Returns selected code or None on cancel."""
-    languages = _get_languages_for_model(settings.model)
+    languages = _get_languages_for_model(settings.model, title=f"Soniox CLI › Settings › {title}")
     if not languages:
         click.echo("No languages available for the selected model.")
         return None
 
-    entries = [f"{code:>4s}  {name}" for code, name in languages]
-    entries.append("Back")
+    entries = ["Back"]
+    entries.extend(f"{code:>4s}  {name}" for code, name in languages)
 
-    cursor_idx = 0
+    cursor_idx = 1
     if current:
-        cursor_idx = next((i for i, (c, _) in enumerate(languages) if c == current), 0)
+        cursor_idx = next((i for i, (c, _) in enumerate(languages) if c == current), 0) + 1
 
     menu = TerminalMenu(
         entries,
-        title=f"\n{title}\n",
+        title=f"\nSoniox CLI › Settings › {title}\n",
         cursor_index=cursor_idx,
         search_key=None,
     )
     choice = menu.show()
 
-    if choice is None or choice == len(entries) - 1:
+    if choice is None or choice == 0:
         return None
-    return languages[choice][0]
+    return languages[choice - 1][0]
 
 
 def _edit_translation(settings: TranscriptionSettings) -> None:
-    entries = ["Disabled", "One-way translation", "Two-way translation", "Back"]
-    menu = TerminalMenu(entries, title="\nTranslation type\n")
+    entries = ["Back", "Disabled", "One-way translation", "Two-way translation"]
+    menu = TerminalMenu(entries, title="\nSoniox CLI › Settings › Translation\n")
     choice = menu.show()
 
-    if choice is None or choice == 3:
-        return
-
-    if choice == 0:
-        settings.translation = None
+    if choice is None or choice == 0:
         return
 
     if choice == 1:
+        settings.translation = None
+        return
+
+    if choice == 2:
         target = _pick_language(settings, "Target language")
         if target:
             settings.translation = TranslationSettings(
                 type="one_way", target_language=target
             )
 
-    if choice == 2:
+    if choice == 3:
         lang_a = _pick_language(settings, "Language A")
         if not lang_a:
             return
@@ -319,26 +325,26 @@ def _edit_context_json(prefill: str | None = None) -> dict | None:
 def _edit_preset_actions(settings: TranscriptionSettings, idx: int) -> None:
     """Sub-menu for editing/renaming/deleting an existing preset."""
     preset = settings.context_presets[idx]
-    entries = ["Edit", "Rename", "Delete", "Back"]
-    menu = TerminalMenu(entries, title=f"\n{preset.name}\n")
+    entries = ["Back", "Edit", "Rename", "Delete"]
+    menu = TerminalMenu(entries, title=f"\nSoniox CLI › Settings › Context › {preset.name}\n")
     choice = menu.show()
 
-    if choice is None or choice == 3:
+    if choice is None or choice == 0:
         return
 
-    if choice == 0:  # Edit
+    if choice == 1:  # Edit
         data = _edit_context_json(json.dumps(preset.context, indent=2))
         if data is not None:
             preset.context = data
 
-    elif choice == 1:  # Rename
+    elif choice == 2:  # Rename
         new_name = click.prompt("New name", default=preset.name).strip()
         if new_name and new_name != preset.name:
             if settings.active_context == preset.name:
                 settings.active_context = new_name
             preset.name = new_name
 
-    elif choice == 2:  # Delete
+    elif choice == 3:  # Delete
         if click.confirm(f"Delete preset '{preset.name}'?", default=False):
             if settings.active_context == preset.name:
                 settings.active_context = None
@@ -348,7 +354,7 @@ def _edit_preset_actions(settings: TranscriptionSettings, idx: int) -> None:
 def _edit_context(settings: TranscriptionSettings) -> None:
     cursor = 0
     while True:
-        entries: list[str] = ["None (disable)", "New context..."]
+        entries: list[str] = ["Back", "None (disable)", "New context..."]
         preset_offset = 0
         if settings.context_presets:
             entries.append("──────────────")
@@ -356,22 +362,20 @@ def _edit_context(settings: TranscriptionSettings) -> None:
             for p in settings.context_presets:
                 marker = "  ✓" if p.name == settings.active_context else ""
                 entries.append(f"{p.name}{marker}")
-        entries.append("──────────────")
-        entries.append("Back")
 
-        menu = TerminalMenu(entries, title="\nContext\n", cursor_index=cursor)
+        menu = TerminalMenu(entries, title="\nSoniox CLI › Settings › Context\n", cursor_index=cursor)
         choice = menu.show()
 
-        if choice is None or entries[choice] == "Back":
+        if choice is None or choice == 0:
             return
 
         cursor = choice
 
-        if choice == 0:  # None (disable)
+        if choice == 1:  # None (disable)
             settings.active_context = None
             return
 
-        if choice == 1:  # New context...
+        if choice == 2:  # New context...
             data = _edit_context_json()
             if data is not None:
                 name = click.prompt("Preset name").strip()
@@ -403,6 +407,8 @@ def show_settings_form() -> None:
         W = 26  # label column width
         context_label = settings.active_context or "OFF"
         items = [
+            "Back",
+            "──────────────",
             f"{'Model:':{W}}{settings.model}",
             f"{'Speaker diarization:':{W}}{_on_off(settings.enable_speaker_diarization)}",
             f"{'Language identification:':{W}}{_on_off(settings.enable_language_identification)}",
@@ -411,38 +417,38 @@ def show_settings_form() -> None:
             f"{'Translation:':{W}}{_format_translation(settings)}",
             f"{'Context:':{W}}{context_label}",
             "──────────────",
-            "Save and back",
-            "Reset to defaults",
+            "Reset",
+            "Save",
         ]
 
-        menu = TerminalMenu(items, title="\nTranscription settings\n", cursor_index=cursor)
+        menu = TerminalMenu(items, title="\nSoniox CLI › Settings\n", cursor_index=cursor)
         choice = menu.show()
 
-        if choice is None:
+        if choice is None or choice == 0:
             return
 
         cursor = choice
 
         match choice:
-            case 0:
-                _edit_model(settings)
-            case 1:
-                settings.enable_speaker_diarization = not settings.enable_speaker_diarization
-            case 2:
-                settings.enable_language_identification = not settings.enable_language_identification
-            case 3:
-                _edit_language_hints(settings)
-            case 4:
-                settings.language_hints_strict = not settings.language_hints_strict
-            case 5:
-                _edit_translation(settings)
-            case 6:
-                _edit_context(settings)
-            case 7:
+            case 1 | 9:
                 pass  # separator
+            case 2:
+                _edit_model(settings)
+            case 3:
+                settings.enable_speaker_diarization = not settings.enable_speaker_diarization
+            case 4:
+                settings.enable_language_identification = not settings.enable_language_identification
+            case 5:
+                _edit_language_hints(settings)
+            case 6:
+                settings.language_hints_strict = not settings.language_hints_strict
+            case 7:
+                _edit_translation(settings)
             case 8:
+                _edit_context(settings)
+            case 10:
+                settings = TranscriptionSettings()
+            case 11:
                 save_settings(settings)
                 click.echo("Settings saved.")
                 return
-            case 9:
-                settings = TranscriptionSettings()

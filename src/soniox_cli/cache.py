@@ -30,12 +30,36 @@ def is_terminal(transcription_id: str) -> bool:
     return meta.get("status") in ("completed", "error")
 
 
-def save(transcription_id: str, meta: dict[str, Any], transcript: str | None = None) -> None:
+def get_cached_tokens(transcription_id: str) -> list[dict[str, Any]] | None:
+    path = _tx_dir(transcription_id) / "tokens.json"
+    if path.exists():
+        return json.loads(path.read_text())
+    return None
+
+
+def get_cached_translation(transcription_id: str) -> str | None:
+    path = _tx_dir(transcription_id) / "translation.txt"
+    if path.exists():
+        return path.read_text()
+    return None
+
+
+def save(
+    transcription_id: str,
+    meta: dict[str, Any],
+    transcript: str | None = None,
+    tokens: list[dict[str, Any]] | None = None,
+    translation: str | None = None,
+) -> None:
     d = _tx_dir(transcription_id)
     d.mkdir(parents=True, exist_ok=True)
     (d / "meta.json").write_text(json.dumps(meta, indent=2, default=str))
     if transcript is not None:
         (d / "transcript.txt").write_text(transcript)
+    if tokens is not None:
+        (d / "tokens.json").write_text(json.dumps(tokens, indent=2, default=str))
+    if translation is not None:
+        (d / "translation.txt").write_text(translation)
 
 
 def delete_cache(transcription_id: str) -> None:

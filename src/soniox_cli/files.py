@@ -23,17 +23,20 @@ def _build_entry(f: object) -> str:
 def _file_actions(file_id: str, filename: str) -> bool:
     """Show actions for a selected file. Returns True if file was deleted."""
     menu = TerminalMenu(
-        ["Retranscribe (coming soon)", "Delete", "Back"],
-        title=f"\n{filename}\n",
+        ["Back", "Retranscribe (coming soon)", "Delete"],
+        title=f"\nSoniox CLI › {filename}\n",
     )
     choice = menu.show()
 
-    if choice == 0:
-        click.echo("  Retranscribe is not yet implemented.")
+    if choice is None or choice == 0:
         return False
 
     if choice == 1:
-        confirm = TerminalMenu(["Yes", "No"], title=f"\nDelete {filename}?\n")
+        click.echo("  Retranscribe is not yet implemented.")
+        return False
+
+    if choice == 2:
+        confirm = TerminalMenu(["Yes", "No"], title=f"\nSoniox CLI › Delete {filename}?\n")
         if confirm.show() == 0:
             client = get_client()
             with Spinner(f"Deleting {filename}..."):
@@ -47,7 +50,7 @@ def _file_actions(file_id: str, filename: str) -> bool:
 def list_files() -> None:
     client = get_client()
 
-    with Spinner("Loading files..."):
+    with Spinner("Loading files...", title="Soniox CLI › Files"):
         result = client.files.list(limit=PAGE_SIZE)
 
     if not result.files:
@@ -59,30 +62,30 @@ def list_files() -> None:
 
     cursor = 0
     while True:
-        entries = [truncate(_build_entry(f)) for f in file_list]
+        entries = ["Back"]
+        entries.extend(truncate(_build_entry(f)) for f in file_list)
         if next_cursor:
             entries.append("Load more...")
-        entries.append("Back")
 
-        menu = TerminalMenu(entries, title="\nFiles\n", cursor_index=cursor)
+        menu = TerminalMenu(entries, title="\nSoniox CLI › Files\n", cursor_index=cursor)
         choice = menu.show()
 
-        if choice is None or choice == len(entries) - 1:
+        if choice is None or choice == 0:
             break
 
         cursor = choice
 
-        if next_cursor and choice == len(entries) - 2:
+        if next_cursor and choice == len(entries) - 1:
             with Spinner("Loading more..."):
                 result = client.files.list(limit=PAGE_SIZE, cursor=next_cursor)
             file_list.extend(result.files)
             next_cursor = result.next_page_cursor
             continue
 
-        f = file_list[choice]
+        f = file_list[choice - 1]
         deleted = _file_actions(f.id, f.filename)
         if deleted:
-            file_list.pop(choice)
+            file_list.pop(choice - 1)
             if not file_list:
                 click.echo("No files remaining.")
                 break
