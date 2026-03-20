@@ -12,6 +12,7 @@ dependencies = [
     "pydantic>=2.0",
     "simple-term-menu>=1.6",
     "pyperclip>=1.8",
+    "click-man>=0.4",
 ]
 
 [project.scripts]
